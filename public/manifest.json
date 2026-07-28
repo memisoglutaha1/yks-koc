@@ -1,0 +1,19 @@
+{
+  "name": "YKS Koçu",
+  "short_name": "YKS Koçu",
+  "description": "YKS hazırlık takip ve koçluk uygulaması",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#1e40af",
+  "orientation": "portrait-primary",
+  "lang": "tr",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
