@@ -1,7 +1,7 @@
 -- YKS Koçu — Supabase şeması
 -- SQL Editor'de bir kez çalıştırın.
 
-create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
 
 create table if not exists public.accounts (
   id uuid primary key default gen_random_uuid(),
@@ -65,7 +65,7 @@ create or replace function public._require_session(p_token uuid)
 returns public.accounts
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   acct public.accounts;
@@ -93,7 +93,7 @@ create or replace function public.register_teacher(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   uname text := lower(trim(p_username));
@@ -136,7 +136,7 @@ create or replace function public.login(p_username text, p_password text)
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   uname text := lower(trim(p_username));
@@ -165,7 +165,7 @@ create or replace function public.logout(p_token uuid)
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 begin
   delete from public.sessions where token = p_token;
@@ -177,7 +177,7 @@ create or replace function public.get_session(p_token uuid)
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   acct public.accounts;
@@ -212,7 +212,7 @@ create or replace function public.get_session(p_token uuid)
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   acct public.accounts;
@@ -256,7 +256,7 @@ create or replace function public.set_viewing_student(p_token uuid, p_student_id
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   teacher public.accounts;
@@ -292,7 +292,7 @@ create or replace function public.create_student(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   teacher public.accounts;
@@ -360,7 +360,7 @@ create or replace function public.list_students(p_token uuid)
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   teacher public.accounts;
@@ -388,7 +388,7 @@ create or replace function public.reset_student_password(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   teacher public.accounts;
@@ -418,7 +418,7 @@ create or replace function public.deactivate_student(p_token uuid, p_student_id 
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   teacher public.accounts;
@@ -447,7 +447,7 @@ create or replace function public.get_student_data(p_token uuid, p_student_id uu
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   actor public.accounts;
@@ -490,7 +490,7 @@ create or replace function public.save_student_data(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   actor public.accounts;
@@ -529,7 +529,7 @@ create or replace function public.get_student_overview(p_token uuid)
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   teacher public.accounts;
