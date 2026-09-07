@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { BottomNav } from './BottomNav'
+import { useAuth } from '../context/AuthContext'
 
 interface LayoutProps {
   title: string
@@ -11,11 +12,13 @@ interface LayoutProps {
 
 export function Layout({ title, subtitle, action, children }: LayoutProps) {
   const location = useLocation()
+  const { viewingStudent } = useAuth()
   const showSettings = !['/ayarlar', '/profil'].includes(location.pathname)
+  const stickyTop = viewingStudent ? 'top-[41px]' : 'top-0'
 
   return (
     <div className="mx-auto min-h-dvh max-w-lg bg-slate-50 pb-24">
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-primary-800 px-4 py-4 text-white shadow-md">
+      <header className={`sticky ${stickyTop} z-40 border-b border-slate-200 bg-primary-800 px-4 py-4 text-white shadow-md`}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold tracking-tight">{title}</h1>

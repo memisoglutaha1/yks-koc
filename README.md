@@ -1,42 +1,35 @@
 # YKS Koçu
 
-Oğlunuzun YKS hazırlığını konu konu, test test ve gün gün takip etmenizi sağlayan mobil uyumlu web uygulaması.
+Öğretmenin birden fazla öğrencinin YKS hazırlığını takip etmesi için mobil uyumlu web uygulaması.
 
-**Hedef sıralama:** İlk 20.000  
-**Başlangıç sıralaması:** 363.000 (2026)
+## Roller
 
-## Özellikler
-
-- **Bugün** — Günlük görevler, hedef ilerleme, hızlı test/deneme girişi
-- **Konular** — TYT/AYT ders ve konu hakimiyeti (TYT 9 ders, AYT 4 ders)
-- **Test** — Doğru/yanlış/boş, süre, soru başına dk analizi
-- **Program** — Haftalık takvim, günlük görev planlama
-- **Deneme** — TYT/AYT net girişi, trend takibi
-- **Rapor** — Deneme grafikleri, zayıf dersler, yavaş konular
+- **Öğretmen** — Öğrenci hesabı oluşturur (kullanıcı adı + şifre), tüm çalışmaları görür, plan/program düzenleyebilir
+- **Öğrenci** — Kendi hesabıyla giriş yapar; test, deneme, konu ve günlük görevlerini kaydeder
 
 ## Kurulum
 
 ```bash
-cd C:\Users\memis\Desktop\yks-kocu
 npm install
 npm run dev
 ```
 
-Tarayıcıda `http://localhost:5173` adresini açın.
+Tarayıcıda Vite’ın verdiği adresi açın (ör. `http://localhost:5173`).
 
-## Tablet / Telefonda Kullanım
+## İlk kullanım
 
-1. Telefon veya tablet tarayıcısından uygulamayı açın
-2. **Ana ekrana ekle** (Safari: Paylaş → Ana Ekrana Ekle / Chrome: Menü → Ana ekrana ekle)
-3. Uygulama gibi tam ekran kullanılabilir
+1. **Öğretmen hesabı oluştur** (`/kurulum`)
+2. Panelden **Öğrenci Ekle** → kullanıcı adı ve şifre ver
+3. Öğrenci aynı tarayıcıda **Giriş** yaparak kendi hesabını kullanır
+4. Öğretmen listeden öğrenciye tıklayarak tüm çalışmaları (test, deneme, konu, program, rapor) inceleyebilir
 
 ## Veri
 
-Tüm veriler cihazda `localStorage` içinde saklanır. Veriler tarayıcıya özeldir; farklı cihazlarda senkron olmaz.
+Hesaplar ve çalışmalar cihazda `localStorage` içinde saklanır. Aynı tarayıcı / cihaz gerekir; farklı cihazlarda otomatik senkron yoktur.
 
 ## Geliştirme
 
 ```bash
-npm run build   # üretim derlemesi
-npm run preview # derlenmiş sürümü önizle
+npm run build
+npm run preview
 ```

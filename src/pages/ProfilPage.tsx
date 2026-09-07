@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom'
 import { Layout, Card, Button, Input, Badge } from '../components/Layout'
 import { RankSelect } from '../components/RankSelect'
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import { getRankProgress } from '../utils/calculations'
 import { TYT_RANK_OPTIONS, AYT_RANK_OPTIONS, formatRank } from '../data/rankOptions'
 
 export function ProfilPage() {
   const { data, updateSettings } = useApp()
+  const { user, viewingStudent, logout, isTeacher } = useAuth()
   const { settings } = data
   const [name, setName] = useState(settings.studentName)
   const [targetRankTyt, setTargetRankTyt] = useState(settings.targetRankTyt)
@@ -17,6 +19,7 @@ export function ProfilPage() {
   const [examYear, setExamYear] = useState(String(settings.examYear))
   const [saved, setSaved] = useState(false)
 
+  const accountUser = viewingStudent ?? user
   const tytProgress = getRankProgress(previousRankTyt, targetRankTyt, previousRankTyt)
   const aytProgress = getRankProgress(previousRankAyt, targetRankAyt, previousRankAyt)
 
@@ -36,6 +39,17 @@ export function ProfilPage() {
 
   return (
     <Layout title="Öğrenci Profili" subtitle="Hedef ve kişisel bilgiler">
+      <Card className="mb-4">
+        <p className="text-xs font-medium text-slate-500">Hesap</p>
+        <p className="font-bold text-slate-800">{accountUser?.displayName}</p>
+        <p className="text-sm text-slate-500">@{accountUser?.username}</p>
+        {isTeacher && viewingStudent && (
+          <span className="mt-2 inline-block">
+            <Badge color="bg-amber-100 text-amber-800">Öğretmen görünümü</Badge>
+          </span>
+        )}
+      </Card>
+
       <form onSubmit={handleSave} className="space-y-4">
         <Card>
           <div className="mb-4 flex items-center gap-3">
@@ -49,7 +63,7 @@ export function ProfilPage() {
           </div>
 
           <div className="space-y-3">
-            <Input label="Öğrenci Adı" value={name} onChange={(e) => setName(e.target.value)} placeholder="Oğlunuzun adı" />
+            <Input label="Öğrenci Adı" value={name} onChange={(e) => setName(e.target.value)} placeholder="Öğrenci adı" />
             <Input label="Sınav Yılı" type="number" value={examYear} onChange={(e) => setExamYear(e.target.value)} />
           </div>
         </Card>
@@ -118,6 +132,9 @@ export function ProfilPage() {
           <span>⚙️ Veri yedekleme ve sıfırlama</span>
           <span className="text-slate-400">→</span>
         </Link>
+        <Button variant="danger" className="mt-3 w-full" onClick={logout}>
+          Çıkış Yap
+        </Button>
       </Card>
 
       <div className="mt-4 text-center">

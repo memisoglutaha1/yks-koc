@@ -1,10 +1,12 @@
 import { Layout, Card, Button, Badge } from '../components/Layout'
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 export function AyarlarPage() {
   const { exportData, importData, resetAllData } = useApp()
+  const { logout, user, viewingStudent } = useAuth()
   const [importText, setImportText] = useState('')
   const [resetPassword, setResetPassword] = useState('')
   const [resetError, setResetError] = useState('')
@@ -104,6 +106,15 @@ export function AyarlarPage() {
         {resetError && <p className="mb-2 text-sm text-red-600">{resetError}</p>}
         <Button variant="danger" className="w-full" onClick={handleReset}>
           Tüm Verileri Sıfırla
+        </Button>
+      </Card>
+
+      <Card className="mt-4">
+        <p className="mb-2 text-sm text-slate-600">
+          Giriş: <strong>@{viewingStudent?.username ?? user?.username}</strong>
+        </p>
+        <Button variant="danger" className="w-full" onClick={logout}>
+          Çıkış Yap
         </Button>
       </Card>
 

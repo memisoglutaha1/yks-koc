@@ -3,8 +3,16 @@ import { useAppStore, type AppStore } from '../hooks/useAppStore'
 
 const AppContext = createContext<AppStore | null>(null)
 
-export function AppProvider({ children }: { children: ReactNode }) {
-  const store = useAppStore()
+export function AppProvider({
+  userId,
+  studentDisplayName,
+  children,
+}: {
+  userId: string
+  studentDisplayName?: string
+  children: ReactNode
+}) {
+  const store = useAppStore(userId, studentDisplayName)
   return <AppContext.Provider value={store}>{children}</AppContext.Provider>
 }
 

@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { addDays, format, startOfWeek, parseISO } from 'date-fns'
-import type { AppData, AppSettings, DailyTask, MockExam, TestResult, PlannerSettings } from '../types'
+import type { AppData, DailyTask, MockExam, TestResult, PlannerSettings } from '../types'
 import { getTemplateById } from '../data/weeklyTemplates'
 import { generateStudyPlan, applyWeekToProgram, DEFAULT_PLANNER_SETTINGS, getWeekDateRange, normalizePlannerSettings } from '../utils/autoPlanner'
 import { generateId, todayStr, RESET_DATA_PASSWORD } from '../utils/calculations'
-
-const STORAGE_KEY = 'yks-kocu-data'
+import { DEFAULT_APP_DATA, DEFAULT_SETTINGS, loadStudentAppData, normalizeAppData, saveStudentAppData } from '../utils/userStorage'
 
 export interface ApplyPlanWeekResult {
   count: number
@@ -18,75 +17,21 @@ export interface GeneratePlanOptions {
   clearProgramTasks?: boolean
 }
 
-function normalizeSettings(settings: Partial<AppSettings> = {}): AppSettings {
-  const targetRankTyt = settings.targetRankTyt ?? settings.targetRank ?? 20000
-  const targetRankAyt = settings.targetRankAyt ?? settings.targetRank ?? 20000
-  const previousRank = settings.previousRank ?? 363000
-  return {
-    studentName: settings.studentName ?? 'Öğrenci',
-    targetRank: Math.min(targetRankTyt, targetRankAyt),
-    targetRankTyt,
-    targetRankAyt,
-    previousRank,
-    previousRankTyt: settings.previousRankTyt ?? previousRank,
-    previousRankAyt: settings.previousRankAyt ?? previousRank,
-    examYear: settings.examYear ?? 2027,
-  }
-}
-
-const DEFAULT_SETTINGS: AppSettings = normalizeSettings({
-  studentName: 'Öğrenci',
-  targetRank: 20000,
-  targetRankTyt: 50000,
-  targetRankAyt: 20000,
-  previousRank: 363000,
-  previousRankTyt: 363000,
-  previousRankAyt: 363000,
-  examYear: 2027,
-})
-
-const DEFAULT_DATA: AppData = {
-  settings: DEFAULT_SETTINGS,
-  testResults: [],
-  dailyTasks: [],
-  mockExams: [],
-  topicProgress: {},
-  plannerSettings: DEFAULT_PLANNER_SETTINGS,
-  generatedPlan: null,
-}
-
-function loadData(): AppData {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { ...DEFAULT_DATA, settings: { ...DEFAULT_SETTINGS } }
-    const parsed = JSON.parse(raw) as AppData
-    return {
-      ...DEFAULT_DATA,
-      ...parsed,
-      settings: normalizeSettings({ ...DEFAULT_SETTINGS, ...parsed.settings }),
-      plannerSettings: normalizePlannerSettings({ ...DEFAULT_PLANNER_SETTINGS, ...parsed.plannerSettings }),
-      generatedPlan: parsed.generatedPlan ?? null,
-    }
-  } catch {
-    return { ...DEFAULT_DATA, settings: { ...DEFAULT_SETTINGS } }
-  }
-}
-
-function saveData(data: AppData): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-}
-
-export function useAppStore() {
-  const [data, setData] = useState<AppData>(loadData)
+export function useAppStore(userId: string, studentDisplayName?: string) {
+  const [data, setData] = useState<AppData>(() => loadStudentAppData(userId, studentDisplayName))
 
   useEffect(() => {
-    saveData(data)
-  }, [data])
+    setData(loadStudentAppData(userId, studentDisplayName))
+  }, [userId, studentDisplayName])
 
-  const updateSettings = useCallback((settings: Partial<AppSettings>) => {
+  useEffect(() => {
+    saveStudentAppData(userId, data)
+  }, [userId, data])
+
+  const updateSettings = useCallback((settings: Partial<AppData['settings']>) => {
     setData((prev) => ({
       ...prev,
-      settings: normalizeSettings({ ...prev.settings, ...settings }),
+      settings: normalizeAppData({ ...prev, settings: { ...prev.settings, ...settings } }).settings,
     }))
   }, [])
 
@@ -196,22 +141,24 @@ export function useAppStore() {
     try {
       const parsed = JSON.parse(json) as AppData
       if (!parsed.settings) return false
-      setData({
-        ...DEFAULT_DATA,
-        ...parsed,
-        settings: normalizeSettings({ ...DEFAULT_SETTINGS, ...parsed.settings }),
-      })
+      setData(normalizeAppData(parsed))
       return true
     } catch {
       return false
     }
   }, [])
 
-  const resetAllData = useCallback((password: string): boolean => {
-    if (password !== RESET_DATA_PASSWORD) return false
-    setData((prev) => ({ ...DEFAULT_DATA, settings: { ...prev.settings } }))
-    return true
-  }, [])
+  const resetAllData = useCallback(
+    (password: string): boolean => {
+      if (password !== RESET_DATA_PASSWORD) return false
+      setData((prev) => ({
+        ...DEFAULT_APP_DATA,
+        settings: { ...DEFAULT_SETTINGS, ...prev.settings },
+      }))
+      return true
+    },
+    [],
+  )
 
   const generateAndSavePlan = useCallback((settings: PlannerSettings, options: GeneratePlanOptions = {}) => {
     const normalized = normalizePlannerSettings(settings)
@@ -220,9 +167,7 @@ export function useAppStore() {
       const plan = generateStudyPlan(normalized, prev.testResults)
       let dailyTasks = prev.dailyTasks
       if (clearProgram) {
-        dailyTasks = prev.dailyTasks.filter(
-          (t) => !(t.topicId && (t.type === 'konu' || t.type === 'test')),
-        )
+        dailyTasks = prev.dailyTasks.filter((t) => !(t.topicId && (t.type === 'konu' || t.type === 'test')))
       }
       return { ...prev, plannerSettings: normalized, generatedPlan: plan, dailyTasks }
     })
@@ -255,10 +200,7 @@ export function useAppStore() {
       const weekDates = new Set(getWeekDateRange(week.weekStart))
       return {
         ...prev,
-        dailyTasks: [
-          ...prev.dailyTasks.filter((t) => !weekDates.has(t.date)),
-          ...newTasks,
-        ],
+        dailyTasks: [...prev.dailyTasks.filter((t) => !weekDates.has(t.date)), ...newTasks],
       }
     })
 
