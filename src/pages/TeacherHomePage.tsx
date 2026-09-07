@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Card, EmptyState, Input, PasswordInput } from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
-import { getStudentOverview } from '../utils/userStorage'
+import { fetchStudentOverviews, type StudentOverviewRemote } from '../utils/cloudApi'
 import { format, parseISO } from 'date-fns'
 import { tr } from 'date-fns/locale'
 
@@ -32,10 +32,10 @@ function StudentPasswordRow({ password }: { password?: string }) {
 }
 
 export function TeacherHomePage() {
-  const { user, getStudents, createStudent, openStudent, resetPassword, removeStudent, logout, refresh } = useAuth()
+  const { user, students, createStudent, openStudent, resetPassword, removeStudent, logout, refreshStudents } = useAuth()
   const navigate = useNavigate()
-  const students = getStudents()
-  const overviews = useMemo(() => students.map(getStudentOverview), [students])
+  const [overviews, setOverviews] = useState<StudentOverviewRemote[]>([])
+  const [loadingOverview, setLoadingOverview] = useState(true)
 
   const [showForm, setShowForm] = useState(false)
   const [displayName, setDisplayName] = useState('')
@@ -44,6 +44,19 @@ export function TeacherHomePage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [createdCreds, setCreatedCreds] = useState<{ username: string; password: string; name: string } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoadingOverview(true)
+    void fetchStudentOverviews().then((rows) => {
+      if (cancelled) return
+      setOverviews(rows)
+      setLoadingOverview(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [students])
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -60,6 +73,7 @@ export function TeacherHomePage() {
     setUsername('')
     setPassword('')
     setShowForm(false)
+    await refreshStudents()
   }
 
   const handleResetPassword = async (studentId: string, name: string) => {
@@ -70,17 +84,16 @@ export function TeacherHomePage() {
       alert(result.error)
       return
     }
-    refresh()
     alert(`Şifre güncellendi.\nYeni şifre: ${next}`)
   }
 
-  const handleRemove = (studentId: string, name: string) => {
-    if (!confirm(`${name} hesabını kaldırmak istiyor musunuz? Veriler cihazda kalır ama giriş yapamaz.`)) return
-    removeStudent(studentId)
+  const handleRemove = async (studentId: string, name: string) => {
+    if (!confirm(`${name} hesabını kaldırmak istiyor musunuz?`)) return
+    await removeStudent(studentId)
   }
 
-  const openAndGo = (studentId: string) => {
-    openStudent(studentId)
+  const openAndGo = async (studentId: string) => {
+    await openStudent(studentId)
     navigate('/')
   }
 
@@ -92,7 +105,7 @@ export function TeacherHomePage() {
             <h1 className="text-xl font-bold">Öğretmen Paneli</h1>
             <p className="mt-0.5 text-sm text-blue-100">{user?.displayName}</p>
           </div>
-          <Button variant="ghost" className="!text-white hover:!bg-white/20" onClick={logout}>
+          <Button variant="ghost" className="!text-white hover:!bg-white/20" onClick={() => void logout()}>
             Çıkış
           </Button>
         </div>
@@ -108,7 +121,9 @@ export function TeacherHomePage() {
               <br />
               Şifre: <strong>{createdCreds.password}</strong>
             </p>
-            <p className="mt-2 text-xs text-green-700">Bu bilgileri öğrenciye verin. Şifreyi panelden istediğiniz zaman görebilirsiniz.</p>
+            <p className="mt-2 text-xs text-green-700">
+              Öğrenci bu bilgilerle herhangi bir cihazdan giriş yapabilir. Şifreyi panelden her zaman görebilirsiniz.
+            </p>
             <Button className="mt-3" variant="secondary" onClick={() => setCreatedCreds(null)}>
               Tamam
             </Button>
@@ -134,7 +149,11 @@ export function TeacherHomePage() {
           </Card>
         )}
 
-        {overviews.length === 0 ? (
+        {loadingOverview ? (
+          <Card>
+            <p className="text-center text-sm text-slate-500">Öğrenciler yükleniyor…</p>
+          </Card>
+        ) : overviews.length === 0 ? (
           <Card>
             <EmptyState
               icon="👥"
@@ -147,7 +166,7 @@ export function TeacherHomePage() {
             {overviews.map(({ user: s, testCount, mockCount, todayCompleted, todayTotal, lastActivity }) => (
               <li key={s.id}>
                 <Card>
-                  <button type="button" className="w-full text-left" onClick={() => openAndGo(s.id)}>
+                  <button type="button" className="w-full text-left" onClick={() => void openAndGo(s.id)}>
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="font-bold text-slate-900">{s.displayName}</p>
@@ -173,8 +192,7 @@ export function TeacherHomePage() {
                     </div>
                     {lastActivity && (
                       <p className="mt-2 text-xs text-slate-400">
-                        Son aktivite:{' '}
-                        {format(parseISO(lastActivity), 'd MMM yyyy', { locale: tr })}
+                        Son aktivite: {format(parseISO(lastActivity), 'd MMM yyyy', { locale: tr })}
                       </p>
                     )}
                   </button>
@@ -185,14 +203,14 @@ export function TeacherHomePage() {
                     <Button
                       variant="secondary"
                       className="flex-1 !py-2 text-xs"
-                      onClick={() => handleResetPassword(s.id, s.displayName)}
+                      onClick={() => void handleResetPassword(s.id, s.displayName)}
                     >
                       Şifre sıfırla
                     </Button>
                     <Button
                       variant="danger"
                       className="flex-1 !py-2 text-xs"
-                      onClick={() => handleRemove(s.id, s.displayName)}
+                      onClick={() => void handleRemove(s.id, s.displayName)}
                     >
                       Kaldır
                     </Button>
@@ -203,9 +221,9 @@ export function TeacherHomePage() {
           </ul>
         )}
 
-        <Card className="bg-amber-50 border-amber-100">
-          <p className="text-sm text-amber-900">
-            Hesaplar ve çalışmalar bu tarayıcıda saklanır. Öğrenciler aynı cihazda / tarayıcıda kendi kullanıcı adıyla giriş yapmalıdır.
+        <Card className="border-green-100 bg-green-50">
+          <p className="text-sm text-green-900">
+            Veriler bulutta. Öğretmen ve öğrenciler farklı telefon / tablet / bilgisayardan aynı hesaplarla giriş yapabilir.
           </p>
         </Card>
       </main>

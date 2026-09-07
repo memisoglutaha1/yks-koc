@@ -113,7 +113,7 @@ export function AyarlarPage() {
         <p className="mb-2 text-sm text-slate-600">
           Giriş: <strong>@{viewingStudent?.username ?? user?.username}</strong>
         </p>
-        <Button variant="danger" className="w-full" onClick={logout}>
+        <Button variant="danger" className="w-full" onClick={() => void logout()}>
           Çıkış Yap
         </Button>
       </Card>

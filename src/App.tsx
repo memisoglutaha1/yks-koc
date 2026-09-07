@@ -48,8 +48,7 @@ function TeacherViewBanner() {
           type="button"
           className="shrink-0 rounded-lg bg-amber-800 px-3 py-1.5 text-xs font-semibold text-white"
           onClick={() => {
-            closeStudent()
-            navigate('/ogretmen')
+            void closeStudent().then(() => navigate('/ogretmen'))
           }}
         >
           Panele dön
@@ -60,13 +59,35 @@ function TeacherViewBanner() {
 }
 
 function RequireAuth({ children }: { children: ReactNode }) {
-  const { user, needsSetup } = useAuth()
-  if (!user) return <Navigate to={needsSetup ? '/kurulum' : '/giris'} replace />
+  const { user } = useAuth()
+  if (!user) return <Navigate to="/giris" replace />
   return children
 }
 
 function AppRoutes() {
-  const { user, isTeacher, viewingStudent, activeStudentId } = useAuth()
+  const { ready, cloudReady, user, isTeacher, viewingStudent, activeStudentId } = useAuth()
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-slate-50 text-sm text-slate-500">
+        Yükleniyor…
+      </div>
+    )
+  }
+
+  if (!cloudReady) {
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center bg-slate-50 px-4 py-8">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p className="font-semibold">Bulut ayarı gerekli</p>
+          <p className="mt-2">
+            Farklı cihazlardan takip için Supabase anahtarlarını ekleyin. Ayrıntılar: <code>README.md</code> ve{' '}
+            <code>supabase/schema.sql</code>
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   if (!user) {
     return (

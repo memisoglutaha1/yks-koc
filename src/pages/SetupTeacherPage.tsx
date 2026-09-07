@@ -4,7 +4,7 @@ import { Button, Card, Input, PasswordInput } from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 
 export function SetupTeacherPage() {
-  const { needsSetup, setupTeacher, user } = useAuth()
+  const { setupTeacher, user } = useAuth()
   const [displayName, setDisplayName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -13,7 +13,6 @@ export function SetupTeacherPage() {
   const [loading, setLoading] = useState(false)
 
   if (user) return <Navigate to="/" replace />
-  if (!needsSetup) return <Navigate to="/giris" replace />
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,7 +32,7 @@ export function SetupTeacherPage() {
       <div className="mb-6 text-center">
         <p className="text-4xl">👩‍🏫</p>
         <h1 className="mt-3 text-2xl font-bold text-primary-800">Öğretmen Hesabı</h1>
-        <p className="mt-1 text-sm text-slate-500">Öğrencilerinizi yönetmek için hesabınızı oluşturun</p>
+        <p className="mt-1 text-sm text-slate-500">Öğrencilerinizi buluttan yönetmek için hesabınızı oluşturun</p>
       </div>
 
       <Card>
@@ -50,7 +49,7 @@ export function SetupTeacherPage() {
       </Card>
 
       <p className="mt-4 text-center text-xs text-slate-500">
-        Hesaplar bu cihazda saklanır. Öğrenciler aynı tarayıcıdan kendi kullanıcı adıyla giriş yapar.
+        Hesap ve veriler bulutta saklanır. Öğrenciler herhangi bir cihazdan giriş yapabilir.
       </p>
       <p className="mt-2 text-center text-sm">
         <Link to="/giris" className="text-primary-700">

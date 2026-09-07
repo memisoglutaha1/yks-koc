@@ -132,7 +132,7 @@ export function ProfilPage() {
           <span>⚙️ Veri yedekleme ve sıfırlama</span>
           <span className="text-slate-400">→</span>
         </Link>
-        <Button variant="danger" className="mt-3 w-full" onClick={logout}>
+        <Button variant="danger" className="mt-3 w-full" onClick={() => void logout()}>
           Çıkış Yap
         </Button>
       </Card>

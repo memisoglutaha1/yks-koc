@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { addDays, format, startOfWeek, parseISO } from 'date-fns'
 import type { AppData, DailyTask, MockExam, TestResult, PlannerSettings } from '../types'
 import { getTemplateById } from '../data/weeklyTemplates'
 import { generateStudyPlan, applyWeekToProgram, DEFAULT_PLANNER_SETTINGS, getWeekDateRange, normalizePlannerSettings } from '../utils/autoPlanner'
 import { generateId, todayStr, RESET_DATA_PASSWORD } from '../utils/calculations'
-import { DEFAULT_APP_DATA, DEFAULT_SETTINGS, loadStudentAppData, normalizeAppData, saveStudentAppData } from '../utils/userStorage'
+import { DEFAULT_APP_DATA, DEFAULT_SETTINGS, normalizeAppData } from '../utils/appData'
+import { fetchStudentAppData, persistStudentAppData } from '../utils/cloudApi'
 
 export interface ApplyPlanWeekResult {
   count: number
@@ -13,20 +14,43 @@ export interface ApplyPlanWeekResult {
 }
 
 export interface GeneratePlanOptions {
-  /** true: eski otomatik plan görevlerini programdan da siler */
   clearProgramTasks?: boolean
 }
 
 export function useAppStore(userId: string, studentDisplayName?: string) {
-  const [data, setData] = useState<AppData>(() => loadStudentAppData(userId, studentDisplayName))
+  const [data, setData] = useState<AppData>(DEFAULT_APP_DATA)
+  const [loading, setLoading] = useState(true)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const skipNextSave = useRef(true)
 
   useEffect(() => {
-    setData(loadStudentAppData(userId, studentDisplayName))
+    let cancelled = false
+    setLoading(true)
+    skipNextSave.current = true
+    void fetchStudentAppData(userId, studentDisplayName).then((loaded) => {
+      if (cancelled) return
+      setData(loaded)
+      setLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [userId, studentDisplayName])
 
   useEffect(() => {
-    saveStudentAppData(userId, data)
-  }, [userId, data])
+    if (loading) return
+    if (skipNextSave.current) {
+      skipNextSave.current = false
+      return
+    }
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      void persistStudentAppData(userId, data)
+    }, 400)
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+    }
+  }, [data, userId, loading])
 
   const updateSettings = useCallback((settings: Partial<AppData['settings']>) => {
     setData((prev) => ({
@@ -103,7 +127,8 @@ export function useAppStore(userId: string, studentDisplayName?: string) {
   }, [])
 
   const getTasksForDate = useCallback(
-    (date: string) => data.dailyTasks.filter((t) => t.date === date).sort((a, b) => (a.scheduledTime ?? '').localeCompare(b.scheduledTime ?? '')),
+    (date: string) =>
+      data.dailyTasks.filter((t) => t.date === date).sort((a, b) => (a.scheduledTime ?? '').localeCompare(b.scheduledTime ?? '')),
     [data.dailyTasks],
   )
 
@@ -148,17 +173,14 @@ export function useAppStore(userId: string, studentDisplayName?: string) {
     }
   }, [])
 
-  const resetAllData = useCallback(
-    (password: string): boolean => {
-      if (password !== RESET_DATA_PASSWORD) return false
-      setData((prev) => ({
-        ...DEFAULT_APP_DATA,
-        settings: { ...DEFAULT_SETTINGS, ...prev.settings },
-      }))
-      return true
-    },
-    [],
-  )
+  const resetAllData = useCallback((password: string): boolean => {
+    if (password !== RESET_DATA_PASSWORD) return false
+    setData((prev) => ({
+      ...DEFAULT_APP_DATA,
+      settings: { ...DEFAULT_SETTINGS, ...prev.settings },
+    }))
+    return true
+  }, [])
 
   const generateAndSavePlan = useCallback((settings: PlannerSettings, options: GeneratePlanOptions = {}) => {
     const normalized = normalizePlannerSettings(settings)
@@ -209,6 +231,7 @@ export function useAppStore(userId: string, studentDisplayName?: string) {
 
   return {
     data,
+    loading,
     updateSettings,
     addTestResult,
     deleteTestResult,

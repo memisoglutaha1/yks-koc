@@ -4,7 +4,7 @@ import { Button, Card, Input, PasswordInput } from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 
 export function LoginPage() {
-  const { login, needsSetup } = useAuth()
+  const { login } = useAuth()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -24,7 +24,7 @@ export function LoginPage() {
       <div className="mb-8 text-center">
         <p className="text-4xl">🎓</p>
         <h1 className="mt-3 text-2xl font-bold text-primary-800">YKS Koçu</h1>
-        <p className="mt-1 text-sm text-slate-500">Öğretmen ve öğrenci girişi</p>
+        <p className="mt-1 text-sm text-slate-500">Öğretmen ve öğrenci girişi · tüm cihazlar</p>
       </div>
 
       <Card>
@@ -50,14 +50,12 @@ export function LoginPage() {
         </form>
       </Card>
 
-      {needsSetup && (
-        <p className="mt-6 text-center text-sm text-slate-600">
-          İlk kurulum için{' '}
-          <Link to="/kurulum" className="font-semibold text-primary-700">
-            öğretmen hesabı oluşturun
-          </Link>
-        </p>
-      )}
+      <p className="mt-6 text-center text-sm text-slate-600">
+        Öğretmen misiniz?{' '}
+        <Link to="/kurulum" className="font-semibold text-primary-700">
+          Hesap oluşturun
+        </Link>
+      </p>
     </div>
   )
 }
