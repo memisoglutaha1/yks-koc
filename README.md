@@ -7,6 +7,10 @@
 - **Öğretmen** — Öğrenci hesabı oluşturur (kullanıcı adı + şifre), tüm çalışmaları görür, plan/program düzenleyebilir
 - **Öğrenci** — Kendi hesabıyla giriş yapar; test, deneme, konu ve günlük görevlerini kaydeder
 
+## Canlı
+
+https://memisoglutaha1.github.io/yks-koc/
+
 ## Kurulum
 
 ```bash
