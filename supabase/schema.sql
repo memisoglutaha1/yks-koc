@@ -116,7 +116,7 @@ begin
     uname,
     coalesce(nullif(trim(p_display_name), ''), 'Öğretmen'),
     'teacher',
-    crypt(p_password, gen_salt('bf')),
+    extensions.crypt(p_password, extensions.gen_salt('bf'::text)),
     null
   )
   returning id into new_id;
@@ -147,7 +147,7 @@ begin
   from public.accounts
   where username = uname and active = true;
 
-  if acct.id is null or acct.password_hash <> crypt(p_password, acct.password_hash) then
+  if acct.id is null or acct.password_hash <> extensions.crypt(p_password, acct.password_hash) then
     return jsonb_build_object('ok', false, 'error', 'Kullanıcı adı veya şifre hatalı.');
   end if;
 
@@ -322,7 +322,7 @@ begin
     uname,
     trim(p_display_name),
     'student',
-    crypt(p_password, gen_salt('bf')),
+    extensions.crypt(p_password, extensions.gen_salt('bf'::text)),
     p_password,
     teacher.id
   )
@@ -402,7 +402,7 @@ begin
   end if;
 
   update public.accounts
-  set password_hash = crypt(p_new_password, gen_salt('bf')),
+  set password_hash = extensions.crypt(p_new_password, extensions.gen_salt('bf'::text)),
       password_plain = p_new_password
   where id = p_student_id and role = 'student' and teacher_id = teacher.id and active = true;
 
