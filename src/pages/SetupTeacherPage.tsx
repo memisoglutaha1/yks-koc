@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Navigate, Link } from 'react-router-dom'
-import { Button, Card, Input } from '../components/Layout'
+import { Button, Card, Input, PasswordInput } from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 
 export function SetupTeacherPage() {
@@ -40,8 +40,8 @@ export function SetupTeacherPage() {
         <form onSubmit={handleSubmit} className="space-y-3">
           <Input label="Adınız" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required placeholder="Örn. Ayşe Öğretmen" />
           <Input label="Kullanıcı adı" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required placeholder="ayse.ogretmen" />
-          <Input label="Şifre" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required />
-          <Input label="Şifre tekrar" type="password" value={password2} onChange={(e) => setPassword2(e.target.value)} autoComplete="new-password" required />
+          <PasswordInput label="Şifre" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required />
+          <PasswordInput label="Şifre tekrar" value={password2} onChange={(e) => setPassword2(e.target.value)} autoComplete="new-password" required />
           {error && <p className="text-sm font-medium text-red-600">{error}</p>}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? 'Oluşturuluyor…' : 'Hesabı Oluştur'}

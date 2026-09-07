@@ -7,6 +7,8 @@ export interface UserAccount {
   role: UserRole
   passwordHash: string
   salt: string
+  /** Öğretmenin görebilmesi için öğrenci şifresi (düz metin) */
+  passwordPlain?: string
   /** Öğrencinin bağlı olduğu öğretmen */
   teacherId?: string
   createdAt: string

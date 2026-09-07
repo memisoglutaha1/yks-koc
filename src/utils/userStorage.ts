@@ -198,6 +198,7 @@ export async function createStudent(
     role: 'student',
     passwordHash,
     salt,
+    passwordPlain: input.password,
     teacherId,
     createdAt: new Date().toISOString(),
     active: true,
@@ -221,7 +222,7 @@ export async function resetStudentPassword(
   if (idx < 0) return { ok: false, error: 'Öğrenci bulunamadı.' }
   const salt = createSalt()
   const passwordHash = await hashPassword(newPassword, salt)
-  users[idx] = { ...users[idx], salt, passwordHash }
+  users[idx] = { ...users[idx], salt, passwordHash, passwordPlain: newPassword }
   saveUsers(users)
   return { ok: true }
 }

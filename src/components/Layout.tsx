@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { BottomNav } from './BottomNav'
 import { useAuth } from '../context/AuthContext'
@@ -127,6 +127,43 @@ export function Input({
         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
         {...props}
       />
+    </label>
+  )
+}
+
+export function PasswordInput({
+  label,
+  value,
+  onChange,
+  ...props
+}: {
+  label: string
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'onChange'>) {
+  const [visible, setVisible] = useState(false)
+
+  return (
+    <label className="block">
+      <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
+      <div className="relative">
+        <input
+          type={visible ? 'text' : 'password'}
+          value={value}
+          onChange={onChange}
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 pr-11 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+          {...props}
+        />
+        <button
+          type="button"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+          onClick={() => setVisible((v) => !v)}
+          aria-label={visible ? 'Şifreyi gizle' : 'Şifreyi göster'}
+          tabIndex={-1}
+        >
+          {visible ? '🙈' : '👁'}
+        </button>
+      </div>
     </label>
   )
 }

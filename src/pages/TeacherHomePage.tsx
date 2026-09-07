@@ -1,13 +1,38 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Badge, Button, Card, EmptyState, Input } from '../components/Layout'
+import { Badge, Button, Card, EmptyState, Input, PasswordInput } from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { getStudentOverview } from '../utils/userStorage'
 import { format, parseISO } from 'date-fns'
 import { tr } from 'date-fns/locale'
 
+function StudentPasswordRow({ password }: { password?: string }) {
+  const [visible, setVisible] = useState(false)
+
+  if (!password) {
+    return <p className="text-xs text-amber-700">Şifre kayıtlı değil — sıfırlayın</p>
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
+      <span className="text-xs text-slate-500">Şifre:</span>
+      <code className="min-w-0 flex-1 truncate font-mono text-sm font-semibold text-slate-800">
+        {visible ? password : '•'.repeat(Math.min(password.length, 12))}
+      </code>
+      <button
+        type="button"
+        className="shrink-0 rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-200"
+        onClick={() => setVisible((v) => !v)}
+        aria-label={visible ? 'Şifreyi gizle' : 'Şifreyi göster'}
+      >
+        {visible ? '🙈' : '👁'}
+      </button>
+    </div>
+  )
+}
+
 export function TeacherHomePage() {
-  const { user, getStudents, createStudent, openStudent, resetPassword, removeStudent, logout } = useAuth()
+  const { user, getStudents, createStudent, openStudent, resetPassword, removeStudent, logout, refresh } = useAuth()
   const navigate = useNavigate()
   const students = getStudents()
   const overviews = useMemo(() => students.map(getStudentOverview), [students])
@@ -45,7 +70,8 @@ export function TeacherHomePage() {
       alert(result.error)
       return
     }
-    alert(`Şifre güncellendi.\nKullanıcı: ilgili öğrenci\nYeni şifre: ${next}`)
+    refresh()
+    alert(`Şifre güncellendi.\nYeni şifre: ${next}`)
   }
 
   const handleRemove = (studentId: string, name: string) => {
@@ -82,7 +108,7 @@ export function TeacherHomePage() {
               <br />
               Şifre: <strong>{createdCreds.password}</strong>
             </p>
-            <p className="mt-2 text-xs text-green-700">Bu bilgileri öğrenciye verin. Şifreyi bir daha göremezsiniz.</p>
+            <p className="mt-2 text-xs text-green-700">Bu bilgileri öğrenciye verin. Şifreyi panelden istediğiniz zaman görebilirsiniz.</p>
             <Button className="mt-3" variant="secondary" onClick={() => setCreatedCreds(null)}>
               Tamam
             </Button>
@@ -99,7 +125,7 @@ export function TeacherHomePage() {
             <form onSubmit={handleCreate} className="space-y-3">
               <Input label="Öğrenci adı" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required placeholder="Ad Soyad" />
               <Input label="Kullanıcı adı" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="ornek.ogrenci" />
-              <Input label="Şifre" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <PasswordInput label="Şifre" value={password} onChange={(e) => setPassword(e.target.value)} required />
               {error && <p className="text-sm font-medium text-red-600">{error}</p>}
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Kaydediliyor…' : 'Hesabı Oluştur'}
@@ -152,6 +178,9 @@ export function TeacherHomePage() {
                       </p>
                     )}
                   </button>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <StudentPasswordRow password={s.passwordPlain} />
+                  </div>
                   <div className="mt-3 flex gap-2 border-t border-slate-100 pt-3">
                     <Button
                       variant="secondary"

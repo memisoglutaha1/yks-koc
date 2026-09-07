@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, Card, Input } from '../components/Layout'
+import { Button, Card, Input, PasswordInput } from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 
 export function LoginPage() {
@@ -36,9 +36,8 @@ export function LoginPage() {
             autoComplete="username"
             required
           />
-          <Input
+          <PasswordInput
             label="Şifre"
-            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"

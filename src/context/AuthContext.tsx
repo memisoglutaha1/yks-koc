@@ -107,9 +107,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resetPassword = useCallback(
     async (studentId: string, newPassword: string) => {
       if (!user || user.role !== 'teacher') return { ok: false as const, error: 'Yetkisiz.' }
-      return resetStudentPassword(user.id, studentId, newPassword)
+      const result = await resetStudentPassword(user.id, studentId, newPassword)
+      if (result.ok) refresh()
+      return result
     },
-    [user],
+    [user, refresh],
   )
 
   const removeStudent = useCallback(
