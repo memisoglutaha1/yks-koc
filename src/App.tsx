@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import { AppProvider } from './context/AppContext'
+import { AppProvider, useApp } from './context/AppContext'
 import { DashboardPage } from './pages/DashboardPage'
 import { KonularPage } from './pages/KonularPage'
 import { TestPage } from './pages/TestPage'
@@ -55,6 +55,47 @@ function TeacherViewBanner() {
         </button>
       </div>
     </div>
+  )
+}
+
+function StudentDataGate({ children }: { children: ReactNode }) {
+  const { loading, loadError, saveError, retryLoad } = useApp()
+
+  if (loading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-slate-50 text-sm text-slate-500">
+        Veriler yükleniyor…
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center bg-slate-50 px-4">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-950">
+          <p className="font-semibold">Veriler alınamadı</p>
+          <p className="mt-2">Kayıtlar değiştirilmedi. {loadError}</p>
+          <button
+            type="button"
+            className="mt-3 rounded-lg bg-red-800 px-3 py-2 text-xs font-semibold text-white"
+            onClick={retryLoad}
+          >
+            Tekrar dene
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {saveError && (
+        <div className="bg-red-100 px-4 py-2 text-center text-xs font-medium text-red-950">
+          Buluta kaydedilemedi. Bu ekrandaki giriş duruyor ve tekrar denenecek. Sayfayı kapatmayın.
+        </div>
+      )}
+      {children}
+    </>
   )
 }
 
@@ -124,7 +165,9 @@ function AppRoutes() {
   return (
     <AppProvider userId={activeStudentId} studentDisplayName={displayName}>
       <TeacherViewBanner />
-      <StudentAppRoutes />
+      <StudentDataGate>
+        <StudentAppRoutes />
+      </StudentDataGate>
     </AppProvider>
   )
 }

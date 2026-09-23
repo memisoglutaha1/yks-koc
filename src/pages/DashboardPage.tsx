@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { Layout, Card, Badge, ProgressBar, StatBox, EmptyState } from '../components/Layout'
 import { useApp } from '../context/AppContext'
 import { CURRICULUM } from '../data/curriculum'
-import { computeSubjectSummaries, getRankProgress } from '../utils/calculations'
+import { computeSubjectSummaries, getRankProgress, mockExamScoreLine, recentMockExams } from '../utils/calculations'
 
 export function DashboardPage() {
   const { data, getTodayTasks, toggleTask } = useApp()
@@ -62,6 +62,30 @@ export function DashboardPage() {
           <StatBox label="Test" value={testResults.length} sub="çözüldü" />
           <StatBox label="Deneme" value={mockExams.length} sub="girildi" />
         </div>
+
+        <Card>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-bold text-slate-800">Denemeler</h2>
+            <Link to="/denemeler" className="text-sm font-medium text-primary-700">
+              Tümü →
+            </Link>
+          </div>
+          {mockExams.length === 0 ? (
+            <EmptyState icon="📝" title="Henüz deneme yok" description="Deneme sonucu girilince burada görünür" />
+          ) : (
+            <ul className="space-y-2">
+              {recentMockExams(mockExams, 4).map((exam) => (
+                <li key={exam.id} className="rounded-lg bg-slate-50 px-3 py-2">
+                  <p className="text-sm font-semibold text-slate-800">{exam.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {exam.date}
+                    {mockExamScoreLine(exam) ? ` · ${mockExamScoreLine(exam)}` : ''}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
 
         <Card>
           <div className="mb-3 flex items-center justify-between">

@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Card, EmptyState, Input, PasswordInput } from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
-import { fetchStudentOverviews, type StudentOverviewRemote } from '../utils/cloudApi'
+import { fetchStudentOverviews, loadStudentAppData, type StudentOverviewRemote } from '../utils/cloudApi'
+import { mockExamScoreLine, recentMockExams } from '../utils/calculations'
+import type { MockExam } from '../types'
 import { format, parseISO } from 'date-fns'
 import { tr } from 'date-fns/locale'
 
@@ -31,10 +33,16 @@ function StudentPasswordRow({ password }: { password?: string }) {
   )
 }
 
+interface StudentCard extends StudentOverviewRemote {
+  exams: MockExam[] | null
+  examsError: string | null
+}
+
 export function TeacherHomePage() {
   const { user, students, createStudent, openStudent, resetPassword, removeStudent, logout, refreshStudents } = useAuth()
   const navigate = useNavigate()
-  const [overviews, setOverviews] = useState<StudentOverviewRemote[]>([])
+  const [overviews, setOverviews] = useState<StudentCard[]>([])
+  const [overviewError, setOverviewError] = useState('')
   const [loadingOverview, setLoadingOverview] = useState(true)
 
   const [showForm, setShowForm] = useState(false)
@@ -47,14 +55,46 @@ export function TeacherHomePage() {
 
   useEffect(() => {
     let cancelled = false
-    setLoadingOverview(true)
-    void fetchStudentOverviews().then((rows) => {
-      if (cancelled) return
-      setOverviews(rows)
+
+    let request = 0
+
+    const load = async () => {
+      const id = ++request
+      const rows = await fetchStudentOverviews()
+      if (cancelled || id !== request) return
+      if (!rows.ok) {
+        setOverviewError(rows.error)
+        setLoadingOverview(false)
+        return
+      }
+      const detailed = await Promise.all(
+        rows.overviews.map(async (row) => {
+          const loaded = await loadStudentAppData(row.user.id, row.user.displayName)
+          if (!loaded.ok) {
+            return { ...row, exams: null, examsError: loaded.error }
+          }
+          return { ...row, exams: loaded.data.mockExams, examsError: null }
+        }),
+      )
+      if (cancelled || id !== request) return
+      setOverviewError('')
+      setOverviews(detailed)
       setLoadingOverview(false)
-    })
+    }
+
+    setLoadingOverview(true)
+    void load()
+    const timer = setInterval(() => {
+      void load()
+    }, 8000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void load()
+    }
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       cancelled = true
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [students])
 
@@ -92,9 +132,9 @@ export function TeacherHomePage() {
     await removeStudent(studentId)
   }
 
-  const openAndGo = async (studentId: string) => {
+  const openAndGo = async (studentId: string, path = '/') => {
     await openStudent(studentId)
-    navigate('/')
+    navigate(path)
   }
 
   return (
@@ -149,11 +189,18 @@ export function TeacherHomePage() {
           </Card>
         )}
 
+        {overviewError && (
+          <Card className="border-red-200 bg-red-50">
+            <p className="text-sm font-medium text-red-800">Öğrenci verisi alınamadı: {overviewError}</p>
+            <p className="mt-1 text-xs text-red-700">Kayıtlar silinmedi. Liste birazdan yeniden denenecek.</p>
+          </Card>
+        )}
+
         {loadingOverview ? (
           <Card>
             <p className="text-center text-sm text-slate-500">Öğrenciler yükleniyor…</p>
           </Card>
-        ) : overviews.length === 0 ? (
+        ) : overviews.length === 0 && !overviewError ? (
           <Card>
             <EmptyState
               icon="👥"
@@ -163,16 +210,19 @@ export function TeacherHomePage() {
           </Card>
         ) : (
           <ul className="space-y-3">
-            {overviews.map(({ user: s, testCount, mockCount, todayCompleted, todayTotal, lastActivity }) => (
+            {overviews.map(({ user: s, testCount, todayCompleted, todayTotal, lastActivity, exams, examsError }) => {
+              const denemeler = exams ? recentMockExams(exams, 6) : []
+              const denemeCount = exams ? exams.length : null
+              return (
               <li key={s.id}>
                 <Card>
-                  <button type="button" className="w-full text-left" onClick={() => void openAndGo(s.id)}>
+                  <button type="button" className="w-full text-left" onClick={() => void openAndGo(s.id, '/denemeler')}>
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="font-bold text-slate-900">{s.displayName}</p>
                         <p className="text-xs text-slate-500">@{s.username}</p>
                       </div>
-                      <Badge color="bg-primary-50 text-primary-800">Çalışmaları gör →</Badge>
+                      <Badge color="bg-primary-50 text-primary-800">Denemeler →</Badge>
                     </div>
                     <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                       <div className="rounded-lg bg-slate-50 py-2">
@@ -180,7 +230,7 @@ export function TeacherHomePage() {
                         <p className="text-[10px] text-slate-500">Test</p>
                       </div>
                       <div className="rounded-lg bg-slate-50 py-2">
-                        <p className="text-lg font-bold text-slate-800">{mockCount}</p>
+                        <p className="text-lg font-bold text-slate-800">{denemeCount ?? '—'}</p>
                         <p className="text-[10px] text-slate-500">Deneme</p>
                       </div>
                       <div className="rounded-lg bg-slate-50 py-2">
@@ -190,6 +240,25 @@ export function TeacherHomePage() {
                         <p className="text-[10px] text-slate-500">Bugün</p>
                       </div>
                     </div>
+                    {examsError && (
+                      <p className="mt-2 text-xs font-medium text-red-600">Denemeler alınamadı: {examsError}</p>
+                    )}
+                    {denemeler.length > 0 && (
+                      <ul className="mt-3 space-y-1.5 text-left">
+                        {denemeler.map((exam) => (
+                          <li key={exam.id} className="rounded-lg bg-purple-50 px-3 py-2">
+                            <p className="text-sm font-semibold text-slate-800">{exam.name}</p>
+                            <p className="text-xs text-slate-500">
+                              {exam.date}
+                              {mockExamScoreLine(exam) ? ` · ${mockExamScoreLine(exam)}` : ''}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {exams && denemeler.length === 0 && (
+                      <p className="mt-3 text-xs text-slate-500">Bu öğrencinin kayıtlı denemesi yok.</p>
+                    )}
                     {lastActivity && (
                       <p className="mt-2 text-xs text-slate-400">
                         Son aktivite: {format(parseISO(lastActivity), 'd MMM yyyy', { locale: tr })}
@@ -217,7 +286,8 @@ export function TeacherHomePage() {
                   </div>
                 </Card>
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
 
