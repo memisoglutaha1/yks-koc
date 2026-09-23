@@ -1,7 +1,8 @@
 import type { AppData } from '../types'
 import type { CreateStudentInput, UserAccount } from '../types/auth'
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
-import { DEFAULT_APP_DATA, normalizeAppData } from './appData'
+import { normalizeAppData } from './appData'
+import { mergeAppData, type SaveTouches } from './mergeAppData'
 
 const TOKEN_KEY = 'yks-kocu-session-token'
 const VIEW_KEY = 'yks-kocu-viewing-student'
@@ -173,29 +174,45 @@ export async function setViewingStudent(studentId: string | null): Promise<void>
   setLocalViewingStudentId(studentId)
 }
 
-export async function fetchStudentAppData(
+export async function loadStudentAppData(
   studentId: string | null,
   displayName?: string,
-): Promise<AppData> {
+): Promise<{ ok: true; data: AppData } | { ok: false; error: string }> {
   const token = getStoredToken()
-  if (!token) return normalizeAppData(null, displayName)
+  if (!token) return { ok: false, error: 'Oturum yok.' }
 
   const result = await rpc<{ data: Partial<AppData> }>('get_student_data', {
     p_token: token,
     p_student_id: studentId,
   })
-  if (!result.ok) return normalizeAppData(null, displayName)
-  return normalizeAppData(result.data ?? null, displayName)
+  if (!result.ok) return { ok: false, error: result.error }
+  return { ok: true, data: normalizeAppData(result.data ?? null, displayName) }
 }
 
-export async function persistStudentAppData(studentId: string | null, data: AppData): Promise<void> {
+export async function persistStudentAppData(
+  studentId: string | null,
+  local: AppData,
+  touches: SaveTouches,
+  replace = false,
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const token = getStoredToken()
-  if (!token) return
-  await rpc('save_student_data', {
+  if (!token) return { ok: false, error: 'Oturum yok.' }
+  if (!studentId) return { ok: false, error: 'Öğrenci seçilmedi.' }
+
+  let payload = local
+  if (!replace) {
+    const remote = await loadStudentAppData(studentId)
+    if (!remote.ok) return remote
+    payload = mergeAppData(remote.data, local, touches)
+  }
+
+  const saved = await rpc('save_student_data', {
     p_token: token,
-    p_data: data,
+    p_data: payload,
     p_student_id: studentId,
   })
+  if (!saved.ok) return saved
+  return { ok: true }
 }
 
 export interface StudentOverviewRemote {
@@ -207,26 +224,28 @@ export interface StudentOverviewRemote {
   lastActivity: string | null
 }
 
-export async function fetchStudentOverviews(): Promise<StudentOverviewRemote[]> {
+export async function fetchStudentOverviews(): Promise<
+  { ok: true; overviews: StudentOverviewRemote[] } | { ok: false; error: string }
+> {
   const token = getStoredToken()
-  if (!token) return []
+  if (!token) return { ok: false, error: 'Oturum yok.' }
   const result = await rpc<{ overviews: Array<Record<string, unknown>> }>('get_student_overview', {
     p_token: token,
   })
-  if (!result.ok) return []
-  return (result.overviews ?? []).map((row) => ({
-    user: mapUser(row.user as Record<string, unknown>),
-    testCount: Number(row.testCount ?? 0),
-    mockCount: Number(row.mockCount ?? 0),
-    todayCompleted: Number(row.todayCompleted ?? 0),
-    todayTotal: Number(row.todayTotal ?? 0),
-    lastActivity: (row.lastActivity as string | null) ?? null,
-  }))
+  if (!result.ok) return { ok: false, error: result.error }
+  return {
+    ok: true,
+    overviews: (result.overviews ?? []).map((row) => ({
+      user: mapUser(row.user as Record<string, unknown>),
+      testCount: Number(row.testCount ?? 0),
+      mockCount: Number(row.mockCount ?? 0),
+      todayCompleted: Number(row.todayCompleted ?? 0),
+      todayTotal: Number(row.todayTotal ?? 0),
+      lastActivity: (row.lastActivity as string | null) ?? null,
+    })),
+  }
 }
 
 export function cloudUnavailableMessage(): string {
   return 'Bulut bağlantısı yok. VITE_SUPABASE_URL ve VITE_SUPABASE_ANON_KEY ayarlayın.'
 }
-
-// Keep DEFAULT exports reachable for store
-export { DEFAULT_APP_DATA, normalizeAppData }

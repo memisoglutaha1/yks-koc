@@ -5,7 +5,8 @@ import { getTemplateById } from '../data/weeklyTemplates'
 import { generateStudyPlan, applyWeekToProgram, DEFAULT_PLANNER_SETTINGS, getWeekDateRange, normalizePlannerSettings } from '../utils/autoPlanner'
 import { generateId, todayStr, RESET_DATA_PASSWORD } from '../utils/calculations'
 import { DEFAULT_APP_DATA, DEFAULT_SETTINGS, normalizeAppData } from '../utils/appData'
-import { fetchStudentAppData, persistStudentAppData } from '../utils/cloudApi'
+import { loadStudentAppData, persistStudentAppData } from '../utils/cloudApi'
+import { cloneTouches, emptyTouches, noteDataDiff, subtractTouches, touchesEmpty, type SaveTouches } from '../utils/mergeAppData'
 
 export interface ApplyPlanWeekResult {
   count: number
@@ -20,68 +21,173 @@ export interface GeneratePlanOptions {
 export function useAppStore(userId: string, studentDisplayName?: string) {
   const [data, setData] = useState<AppData>(DEFAULT_APP_DATA)
   const [loading, setLoading] = useState(true)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const skipNextSave = useRef(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  const dataRef = useRef(data)
+  const userIdRef = useRef(userId)
+  const hydratedRef = useRef(false)
+  const dirtyRef = useRef(false)
+  const replaceRef = useRef(false)
+  const saveLock = useRef(false)
+  const refreshGen = useRef(0)
+  const touchesRef = useRef<SaveTouches>(emptyTouches())
+  const epochRef = useRef(0)
+  dataRef.current = data
+
+  const applyRemote = useCallback((next: AppData) => {
+    setData(next)
+  }, [])
+
+  const saveNow = useCallback(async () => {
+    if (!hydratedRef.current || !dirtyRef.current || saveLock.current) return
+    saveLock.current = true
+    refreshGen.current += 1
+    const studentId = userIdRef.current
+    const epoch = epochRef.current
+    try {
+      do {
+        const snapshot = dataRef.current
+        const touchSnap = cloneTouches(touchesRef.current)
+        const replace = replaceRef.current
+        const saved = await persistStudentAppData(studentId, snapshot, touchSnap, replace)
+        if (epoch !== epochRef.current) return
+        if (!saved.ok) {
+          setSaveError(saved.error)
+          return
+        }
+        subtractTouches(touchesRef.current, touchSnap)
+        if (replace) replaceRef.current = false
+        if (touchesEmpty(touchesRef.current) && !replaceRef.current) {
+          dirtyRef.current = false
+          setSaveError(null)
+        }
+      } while (dirtyRef.current)
+    } finally {
+      saveLock.current = false
+      refreshGen.current += 1
+    }
+  }, [])
+
+  const refreshFromServer = useCallback(async () => {
+    if (!hydratedRef.current || dirtyRef.current || saveLock.current) return
+    const gen = ++refreshGen.current
+    const studentId = userIdRef.current
+    const loaded = await loadStudentAppData(studentId, studentDisplayName)
+    if (gen !== refreshGen.current || dirtyRef.current || saveLock.current) return
+    if (!loaded.ok) return
+    applyRemote(loaded.data)
+  }, [applyRemote, studentDisplayName])
+
+  useEffect(() => {
+    const flush = () => {
+      if (hydratedRef.current && dirtyRef.current) void saveNow()
+    }
+    window.addEventListener('pagehide', flush)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      flush()
+    }
+  }, [saveNow, userId])
+
+  useEffect(() => {
+    userIdRef.current = userId
+  }, [userId])
 
   useEffect(() => {
     let cancelled = false
+    epochRef.current += 1
+    hydratedRef.current = false
+    dirtyRef.current = false
+    replaceRef.current = false
+    touchesRef.current = emptyTouches()
     setLoading(true)
-    skipNextSave.current = true
-    void fetchStudentAppData(userId, studentDisplayName).then((loaded) => {
+    setLoadError(null)
+    void loadStudentAppData(userId, studentDisplayName).then((loaded) => {
       if (cancelled) return
-      setData(loaded)
+      if (!loaded.ok) {
+        setLoadError(loaded.error)
+        setLoading(false)
+        return
+      }
+      setData(loaded.data)
+      hydratedRef.current = true
       setLoading(false)
     })
     return () => {
       cancelled = true
     }
-  }, [userId, studentDisplayName])
+  }, [userId, studentDisplayName, reloadKey])
 
   useEffect(() => {
-    if (loading) return
-    if (skipNextSave.current) {
-      skipNextSave.current = false
-      return
-    }
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => {
-      void persistStudentAppData(userId, data)
+    if (loading || loadError) return
+    if (!dirtyRef.current) return
+    const timer = setTimeout(() => {
+      void saveNow()
     }, 400)
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current)
+    return () => clearTimeout(timer)
+  }, [data, loading, loadError, saveNow])
+
+  useEffect(() => {
+    if (loading || loadError) return
+    const timer = setInterval(() => {
+      if (dirtyRef.current) void saveNow()
+      else void refreshFromServer()
+    }, 8000)
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      if (dirtyRef.current) void saveNow()
+      else void refreshFromServer()
     }
-  }, [data, userId, loading])
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [loading, loadError, refreshFromServer, saveNow])
+
+  const commit = useCallback((recipe: (prev: AppData) => AppData) => {
+    setData((prev) => {
+      const next = recipe(prev)
+      if (noteDataDiff(prev, next, touchesRef.current)) dirtyRef.current = true
+      return next
+    })
+  }, [])
+
+  const retryLoad = useCallback(() => {
+    setReloadKey((key) => key + 1)
+  }, [])
 
   const updateSettings = useCallback((settings: Partial<AppData['settings']>) => {
-    setData((prev) => ({
+    commit((prev) => ({
       ...prev,
       settings: normalizeAppData({ ...prev, settings: { ...prev.settings, ...settings } }).settings,
     }))
-  }, [])
+  }, [commit])
 
   const addTestResult = useCallback((result: Omit<TestResult, 'id'>) => {
-    setData((prev) => ({
+    commit((prev) => ({
       ...prev,
       testResults: [...prev.testResults, { ...result, id: generateId() }],
     }))
-  }, [])
+  }, [commit])
 
   const deleteTestResult = useCallback((id: string) => {
-    setData((prev) => ({
+    commit((prev) => ({
       ...prev,
       testResults: prev.testResults.filter((r) => r.id !== id),
     }))
-  }, [])
+  }, [commit])
 
   const addDailyTask = useCallback((task: Omit<DailyTask, 'id' | 'completed'>) => {
-    setData((prev) => ({
+    commit((prev) => ({
       ...prev,
       dailyTasks: [...prev.dailyTasks, { ...task, id: generateId(), completed: false }],
     }))
-  }, [])
+  }, [commit])
 
   const toggleTask = useCallback((id: string) => {
-    setData((prev) => ({
+    commit((prev) => ({
       ...prev,
       dailyTasks: prev.dailyTasks.map((t) =>
         t.id === id
@@ -93,38 +199,38 @@ export function useAppStore(userId: string, studentDisplayName?: string) {
           : t,
       ),
     }))
-  }, [])
+  }, [commit])
 
   const deleteTask = useCallback((id: string) => {
-    setData((prev) => ({
+    commit((prev) => ({
       ...prev,
       dailyTasks: prev.dailyTasks.filter((t) => t.id !== id),
     }))
-  }, [])
+  }, [commit])
 
   const addMockExam = useCallback((exam: Omit<MockExam, 'id'>) => {
-    setData((prev) => ({
+    commit((prev) => ({
       ...prev,
       mockExams: [...prev.mockExams, { ...exam, id: generateId() }],
     }))
-  }, [])
+  }, [commit])
 
   const deleteMockExam = useCallback((id: string) => {
-    setData((prev) => ({
+    commit((prev) => ({
       ...prev,
       mockExams: prev.mockExams.filter((e) => e.id !== id),
     }))
-  }, [])
+  }, [commit])
 
   const markTopicStudied = useCallback((topicId: string) => {
-    setData((prev) => ({
+    commit((prev) => ({
       ...prev,
       topicProgress: {
         ...prev.topicProgress,
         [topicId]: { studied: true, studiedAt: new Date().toISOString() },
       },
     }))
-  }, [])
+  }, [commit])
 
   const getTasksForDate = useCallback(
     (date: string) =>
@@ -152,13 +258,13 @@ export function useAppStore(userId: string, studentDisplayName?: string) {
       completed: false,
     }))
 
-    setData((prev) => ({
+    commit((prev) => ({
       ...prev,
       dailyTasks: [...prev.dailyTasks, ...newTasks],
     }))
 
     return newTasks.length
-  }, [])
+  }, [commit])
 
   const exportData = useCallback(() => JSON.stringify(data, null, 2), [data])
 
@@ -166,6 +272,8 @@ export function useAppStore(userId: string, studentDisplayName?: string) {
     try {
       const parsed = JSON.parse(json) as AppData
       if (!parsed.settings) return false
+      replaceRef.current = true
+      dirtyRef.current = true
       setData(normalizeAppData(parsed))
       return true
     } catch {
@@ -175,6 +283,8 @@ export function useAppStore(userId: string, studentDisplayName?: string) {
 
   const resetAllData = useCallback((password: string): boolean => {
     if (password !== RESET_DATA_PASSWORD) return false
+    replaceRef.current = true
+    dirtyRef.current = true
     setData((prev) => ({
       ...DEFAULT_APP_DATA,
       settings: { ...DEFAULT_SETTINGS, ...prev.settings },
@@ -185,7 +295,7 @@ export function useAppStore(userId: string, studentDisplayName?: string) {
   const generateAndSavePlan = useCallback((settings: PlannerSettings, options: GeneratePlanOptions = {}) => {
     const normalized = normalizePlannerSettings(settings)
     const clearProgram = options.clearProgramTasks === true
-    setData((prev) => {
+    commit((prev) => {
       const plan = generateStudyPlan(normalized, prev.testResults)
       let dailyTasks = prev.dailyTasks
       if (clearProgram) {
@@ -193,16 +303,16 @@ export function useAppStore(userId: string, studentDisplayName?: string) {
       }
       return { ...prev, plannerSettings: normalized, generatedPlan: plan, dailyTasks }
     })
-  }, [])
+  }, [commit])
 
   const savePlannerSettings = useCallback((settings: PlannerSettings) => {
-    setData((prev) => ({ ...prev, plannerSettings: normalizePlannerSettings(settings) }))
-  }, [])
+    commit((prev) => ({ ...prev, plannerSettings: normalizePlannerSettings(settings) }))
+  }, [commit])
 
   const applyPlanWeek = useCallback((weekNumber: number): ApplyPlanWeekResult => {
     let result: ApplyPlanWeekResult = { count: 0, weekStart: null, weekEnd: null }
 
-    setData((prev) => {
+    commit((prev) => {
       const plan = prev.generatedPlan
       const plannerSettings = prev.plannerSettings ?? DEFAULT_PLANNER_SETTINGS
       if (!plan) return prev
@@ -227,11 +337,14 @@ export function useAppStore(userId: string, studentDisplayName?: string) {
     })
 
     return result
-  }, [])
+  }, [commit])
 
   return {
     data,
     loading,
+    loadError,
+    saveError,
+    retryLoad,
     updateSettings,
     addTestResult,
     deleteTestResult,

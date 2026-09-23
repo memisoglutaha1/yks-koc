@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 
 const links = [
   { to: '/', label: 'Bugün', icon: '📋' },
+  { to: '/denemeler', label: 'Deneme', icon: '📝' },
   { to: '/plan', label: 'Plan', icon: '🤖' },
   { to: '/konular', label: 'Konu', icon: '📚' },
   { to: '/test', label: 'Test', icon: '✏️' },

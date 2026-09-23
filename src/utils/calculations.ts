@@ -181,6 +181,21 @@ export const TASK_TYPE_COLORS: Record<string, string> = {
   mola: 'border-l-slate-400',
 }
 
+export function recentMockExams(exams: MockExam[], limit = 6): MockExam[] {
+  return exams
+    .map((exam, index) => ({ exam, index }))
+    .sort((a, b) => b.exam.date.localeCompare(a.exam.date) || b.index - a.index)
+    .slice(0, limit)
+    .map(({ exam }) => exam)
+}
+
+export function mockExamScoreLine(exam: Pick<MockExam, 'tytTotal' | 'aytTotal'>): string {
+  const parts: string[] = []
+  if (exam.tytTotal !== undefined) parts.push(`TYT ${exam.tytTotal.toFixed(1)}`)
+  if (exam.aytTotal !== undefined) parts.push(`AYT ${exam.aytTotal.toFixed(1)}`)
+  return parts.join(' · ')
+}
+
 export function getMockExamSosyalTotal(exam: Pick<MockExam, 'tarih' | 'cografya' | 'felsefe' | 'din' | 'sosyal'>): number {
   const splitTotal = (exam.tarih ?? 0) + (exam.cografya ?? 0) + (exam.felsefe ?? 0) + (exam.din ?? 0)
   if (splitTotal > 0) return splitTotal
